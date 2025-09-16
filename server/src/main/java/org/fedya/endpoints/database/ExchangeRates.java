@@ -10,6 +10,7 @@ import java.util.ArrayList;
 
 @Data
 @Repository
+
 public class ExchangeRates {
 
     private static List<ExchangeRateDTO> exchangeRates = new ArrayList<>();
