@@ -1,6 +1,7 @@
 package org.fedya.endpoints;
 
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.fedya.endpoints.database.Currencies;
 import org.fedya.endpoints.dto.CurrencyDTO;
 import org.springframework.http.ResponseEntity;
@@ -10,20 +11,24 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/currencies")
+@RequiredArgsConstructor
 public class CurrenciesEndpoints {
+    private final Currencies currenciesObj;
 
     @GetMapping
     public ResponseEntity<List<CurrencyDTO>> getAllCurrencies() {
-        List<CurrencyDTO> currencies = Currencies.getAllCurrencies();
+        List<CurrencyDTO> currencies = currenciesObj.getAllCurrencies();
+        // плохо именуешь классы, лучше писать CurrenciesRepository, чтобы не приходилось писать currenciesObj
         if (currencies == null) {
             return ResponseEntity.status(HTTPStatus.DATABASE_NOT_AVAILABLE.getStatusCode()).build();
         }
+        //хвалю, хорошо сделано
         return ResponseEntity.ok(currencies);
     }
 
     @GetMapping("/{code}")
     public ResponseEntity<CurrencyDTO> getCurrency(@PathVariable("code") String code) {
-        CurrencyDTO currency = Currencies.findByCode(code);
+        CurrencyDTO currency = currenciesObj.findByCode(code);
         if (currency != null){
             return ResponseEntity.ok(currency);
         }
@@ -35,14 +40,14 @@ public class CurrenciesEndpoints {
         if (name == null || code == null || sign == null){
             return ResponseEntity.status(HTTPStatus.FIELD_CURRENCY_MISSING.getStatusCode()).build();
         }
-        int statusRegistered = Currencies.isRegistered(code);
+        int statusRegistered = currenciesObj.isRegistered(code);
         if (statusRegistered == 500){
             return ResponseEntity.status(HTTPStatus.DATABASE_NOT_AVAILABLE.getStatusCode()).build();
         }
         if (statusRegistered == 1){
             return ResponseEntity.status(HTTPStatus.CURRENCY_ALREADY_REGISTERED.getStatusCode()).build();
         }
-        CurrencyDTO result = Currencies.addCurrency(new CurrencyDTO(code, name, sign));
+        CurrencyDTO result = currenciesObj.addCurrency(new CurrencyDTO(code, name, sign));
         return ResponseEntity.ok(result);
     }
 }

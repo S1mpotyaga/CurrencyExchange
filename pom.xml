@@ -45,6 +45,7 @@
             <artifactId>log4j-slf4j-impl</artifactId>
             <version>2.20.0</version>
         </dependency>
+<!--        в Lombok есть реализация api для логгера: аннотация @Slf4j-->
     </dependencies>
 
     <build>
