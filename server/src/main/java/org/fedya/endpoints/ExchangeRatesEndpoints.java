@@ -1,8 +1,7 @@
 package org.fedya.endpoints;
 
-import lombok.RequiredArgsConstructor;
-import org.fedya.endpoints.database.Currencies;
-import org.fedya.endpoints.database.ExchangeRates;
+import org.fedya.endpoints.database.CurrenciesRepository;
+import org.fedya.endpoints.database.ExchangeRateRepository;
 import org.fedya.endpoints.dto.ExchangeRateDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -12,20 +11,18 @@ import java.util.List;
 
 @RestController
 public class ExchangeRatesEndpoints {
-    private final ExchangeRates exchangeRates;
-    private final Currencies currencies;
+    private final ExchangeRateRepository exchangeRateRepository;
+    private final CurrenciesRepository currenciesRepository;
 
     @Autowired
-    public ExchangeRatesEndpoints(ExchangeRates exchangeRates, Currencies currencies) {
-        this.exchangeRates = exchangeRates;
-        this.currencies = currencies;
-        // просто еще один удобный и понятный способ внедрения бина, по факту то
-        // что генерится lombok когда ты ставишь аннотацию RequiredArgsConstructor
+    public ExchangeRatesEndpoints(ExchangeRateRepository exchangeRateRepository, CurrenciesRepository currenciesRepository) {
+        this.exchangeRateRepository = exchangeRateRepository;
+        this.currenciesRepository = currenciesRepository;
     }
 
     @GetMapping("/exchangeRates")
     public ResponseEntity<List<ExchangeRateDTO>> getAllExchangeRates() {
-        List<ExchangeRateDTO> result = exchangeRates.getAllExchangeRates();
+        List<ExchangeRateDTO> result = exchangeRateRepository.getExchangeRates();
         if (result == null) {
             return ResponseEntity.status(HTTPStatus.DATABASE_NOT_AVAILABLE.getStatusCode()).build();
         }
@@ -39,14 +36,14 @@ public class ExchangeRatesEndpoints {
         }
         String baseCurrencyCode = pair.substring(0, 3).toUpperCase();
         String targetCurrencyCode = pair.substring(3).toUpperCase();
-        int status = exchangeRates.isRegistered(baseCurrencyCode, targetCurrencyCode);
+        int status = exchangeRateRepository.isRegistered(baseCurrencyCode, targetCurrencyCode);
         if (status == 500) {
             return ResponseEntity.status(HTTPStatus.DATABASE_NOT_AVAILABLE.getStatusCode()).build();
         }
         if (status == 0) {
             return ResponseEntity.status(HTTPStatus.EXCHANGE_RATE_NOT_FOUND.getStatusCode()).build();
         }
-        return ResponseEntity.ok(exchangeRates.findByCodesCurrency(baseCurrencyCode, targetCurrencyCode));
+        return ResponseEntity.ok(exchangeRateRepository.findByCodes(baseCurrencyCode, targetCurrencyCode));
     }
 
     @PostMapping("/exchangeRates")
@@ -54,18 +51,44 @@ public class ExchangeRatesEndpoints {
         if (baseCurrencyCode == null || targetCurrencyCode == null || rate == null) {
             return ResponseEntity.status(HTTPStatus.FIELD_EXCHANGE_RATE_MISSING.getStatusCode()).build();
         }
-        int statusExchangeRate = exchangeRates.isRegistered(baseCurrencyCode, targetCurrencyCode);
+        int statusExchangeRate = exchangeRateRepository.isRegistered(baseCurrencyCode, targetCurrencyCode);
         if (statusExchangeRate == 500) {
             return ResponseEntity.status(HTTPStatus.DATABASE_NOT_AVAILABLE.getStatusCode()).build();
         }
         if (statusExchangeRate == 1) {
             return ResponseEntity.status(HTTPStatus.EXCHANGE_RATE_ALREADY_REGISTERED.getStatusCode()).build();
         }
-        int statusBaseCurrency = currencies.isRegistered(baseCurrencyCode);
-        int statusTargetCurrency = currencies.isRegistered(targetCurrencyCode);
+        int statusBaseCurrency = currenciesRepository.isRegistered(baseCurrencyCode);
+        int statusTargetCurrency = currenciesRepository.isRegistered(targetCurrencyCode);
         if (statusBaseCurrency == 0 || statusTargetCurrency == 0) {
             return ResponseEntity.status(HTTPStatus.CURRENCY_NOT_FOUND.getStatusCode()).build();
         }
-        return ResponseEntity.ok(exchangeRates.addExchangeRate(baseCurrencyCode, targetCurrencyCode, rate));
+        return ResponseEntity.ok(exchangeRateRepository.addExchangeRate(baseCurrencyCode, targetCurrencyCode, rate));
+    }
+
+    @PatchMapping("/exchangeRate/{pair}")
+    public ResponseEntity<ExchangeRateDTO> changeRate(@PathVariable String pair, @RequestParam(required = false) Double rate) {
+        if (rate == null) {
+            return ResponseEntity.status(HTTPStatus.FIELD_EXCHANGE_RATE_MISSING.getStatusCode()).build();
+        }
+        String baseCurrency = pair.substring(0, 3);
+        String targetCurrency = pair.substring(3, 6);
+        ExchangeRateDTO exchangeRate = exchangeRateRepository.changeRate(baseCurrency, targetCurrency, rate);
+        if (exchangeRate == null) {
+            return ResponseEntity.status(HTTPStatus.EXCHANGE_RATE_NOT_FOUND.getStatusCode()).build();
+        }
+        return ResponseEntity.ok(exchangeRate);
+    }
+
+    @GetMapping("/exchange")
+    public ResponseEntity<?> currencyExchange(@RequestParam(required = false) String from, @RequestParam(required = false) String to, @RequestParam(required = false) Double amount) {
+        if (from == null || to == null || amount == null) {
+            return ResponseEntity.status(HTTPStatus.FIELD_EXCHANGE_RATE_MISSING.getStatusCode()).body(HTTPStatus.getJSONMessage(HTTPStatus.FIELD_EXCHANGE_RATE_MISSING));
+        }
+        Object result = exchangeRateRepository.calculate(from, to, amount);
+        if (result instanceof HTTPStatus tmp) {
+            return ResponseEntity.status(tmp.getStatusCode()).body(tmp.getStatusMessage());
+        }
+        return ResponseEntity.ok(result);
     }
 }

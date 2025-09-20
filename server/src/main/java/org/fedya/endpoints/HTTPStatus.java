@@ -2,6 +2,10 @@ package org.fedya.endpoints;
 
 
 import lombok.Getter;
+import org.springframework.http.ResponseEntity;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Getter
 public enum HTTPStatus {
@@ -22,5 +26,11 @@ public enum HTTPStatus {
     HTTPStatus(int statusCode, String statusMessage) {
         this.statusCode = statusCode;
         this.statusMessage = statusMessage;
+    }
+
+    public static Map<String, String> getJSONMessage(HTTPStatus message) {
+        HashMap<String, String> result = new HashMap<>();
+        result.put("Message", message.getStatusMessage());
+        return result;
     }
 }
